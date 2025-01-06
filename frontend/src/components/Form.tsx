@@ -1,11 +1,33 @@
-import React, { useState } from "react";
+import { useState } from "react";
 import { Paper, Box, TextField, Button, Snackbar, Alert } from "@mui/material";
 import { gql, useMutation } from "@apollo/client";
+
+type Country = {
+  id: number;
+  name: string;
+  emoji: string;
+};
+
+type GetCountriesData = {
+  countries: Country[];
+};
+
 
 // Définir la mutation GraphQL
 const ADD_COUNTRY = gql`
   mutation AddCountry($data: NewCountryInput!) {
     addCountry(data: $data) {
+      id
+      name
+      emoji
+    }
+  }
+`;
+
+// Requête utilisée dans Cardsflags pour récupérer la liste des pays
+const GET_COUNTRIES = gql`
+  query GetCountries {
+    countries {
       id
       name
       emoji
@@ -21,10 +43,26 @@ export default function Form() {
   const [openSnackbar, setOpenSnackbar] = useState(false);
   const [errorMessage, setErrorMessage] = useState("");
 
-  // Mutation GraphQL
-  const [addCountry, { loading, error }] = useMutation(ADD_COUNTRY);
+  // Mutation GraphQL avec mise à jour du cache
+  const [addCountry, { loading }] = useMutation(ADD_COUNTRY, {
+    update(cache, { data: { addCountry } }) {
+      const existingCountries = cache.readQuery<GetCountriesData>({
+        query: GET_COUNTRIES,
+      });
+  
+      // Vérifier si des pays existent déjà
+      if (existingCountries && addCountry) {
+        cache.writeQuery<GetCountriesData>({
+          query: GET_COUNTRIES,
+          data: {
+            countries: [...existingCountries.countries, addCountry],
+          },
+        });
+      }
+    },
+  });
+  
 
-  // Fonction pour soumettre le formulaire
   const handleSubmit = async () => {
     try {
       await addCountry({
@@ -40,7 +78,7 @@ export default function Form() {
       setName("");
       setEmoji("");
       setCode("");
-      setOpenSnackbar(true);
+      setOpenSnackbar(true)
     } catch (err: any) {
       setErrorMessage(err.message || "Erreur lors de l'ajout du pays.");
     }
@@ -103,7 +141,7 @@ export default function Form() {
             "&:hover": { backgroundColor: "#e73370" },
           }}
           onClick={handleSubmit}
-          disabled={loading} // Désactiver pendant le chargement
+          disabled={loading}
         >
           {loading ? "Ajout..." : "Add"}
         </Button>
